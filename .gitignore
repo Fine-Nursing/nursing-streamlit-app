@@ -1,0 +1,12 @@
+# Credentials
+.streamlit
+
+# Environment
+.venv
+
+# Test Files
+ai_suggestions.ipynb
+
+# pycache
+__pycache__
+.DS_Store
