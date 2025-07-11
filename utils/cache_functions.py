@@ -66,7 +66,9 @@ def skills_overlap():
         o.specialty_2_id,
         o.shared_skills,
         o.total_skills,
-        o.overlap_percentage
+        o.overlap_percentage,
+        o.shared_skill_names,
+        o.avg_importance
     from public.specialty_skill_overlap o
     left join specialties s1
         on o.specialty_1_id = s1.id
@@ -93,3 +95,24 @@ def specialty_compensation():
     group by 1,2
     """), engine)
     return comp_df
+
+@st.cache_data(ttl=600)
+def average_pay_model():
+    return pd.read_sql(text("""
+    select
+        total_years_of_experience_group,
+        specialty,
+        organization_state state,
+        count(*) as num_jobs,
+        avg(base_pay) as avg_base_pay,
+        min(base_pay) as min_base_pay,
+        max(base_pay) as max_base_pay,
+        percentile_cont(0.25) within group (order by base_pay) as p25_base_pay,
+        percentile_cont(0.5) within group (order by base_pay) as median_base_pay,
+        percentile_cont(0.75) within group (order by base_pay) as p75_base_pay
+    from job_details jd
+    left join jobs j on jd.job_id = j.id
+    left join professional_info pi on j.user_id = pi.user_id
+    where total_years_of_experience_group is not null
+    group by 1,2,3
+    """), engine)

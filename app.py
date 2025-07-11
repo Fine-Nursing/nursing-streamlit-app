@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.cache_functions import load_nursing_data, skills_overlap, specialty_compensation
+from utils.cache_functions import load_nursing_data, skills_overlap, specialty_compensation, average_pay_model
 from utils.llm_functions import generate_nurse_summary_for_user, generate_culture_summary_from_inputs, compute_skill_transfer_options, refine_skill_transfer_bullets
 
 st.set_page_config(page_title="Nurse AI Summary Tester", layout="wide")
@@ -11,6 +11,7 @@ st.set_page_config(page_title="Nurse AI Summary Tester", layout="wide")
 nursing_df = load_nursing_data()
 skills_overlap_df = skills_overlap()
 specialty_comp_df = specialty_compensation()
+average_pay_df = average_pay_model()
 
 # Define important fields for summary quality
 important_fields = [
@@ -93,7 +94,7 @@ with tab1:
         with st.spinner("Generating professional summary..."):
             summary, prompt, fields_used = generate_nurse_summary_for_user(selected_user, filtered_df)
             st.success("✅ Summary Generated")
-            st.code(summary, language="markdown")
+            st.code(summary)
 
             with st.expander("🧾 Prompt Sent to OpenAI"):
                 st.code(prompt, language="markdown")
@@ -162,12 +163,14 @@ with tab2:
                 with st.expander("📋 Inputs Used"):
                     st.json(inputs_used)
 
-# 3. Skill Transfer Tab (placeholder)
+# 3. Skill Transfer Tab
 with tab3:
     st.subheader("Skill Transfer Insights")
 
     user_specialty = user_rows['specialty'].iloc[0]
     user_base_pay = user_rows['base_pay'].iloc[0]
+    years_group = user_rows['total_years_of_experience_group'].iloc[0]
+    state = user_rows['state'].iloc[0]
 
     if not user_specialty or pd.isna(user_specialty):
         st.warning("🚫 No specialty info available for the selected user.")
@@ -176,14 +179,15 @@ with tab3:
     else:
         st.markdown(f"**Current Specialty:** `{user_specialty}` at ${user_base_pay}/hr")
 
-        # Skill transfer insight
         if st.button("Show Potential Transfers", key="skills"):
             with st.spinner("Analyzing skill overlap and compensation..."):
-                error_msg, bullets = compute_skill_transfer_options(
+                error_msg, suggestions_df = compute_skill_transfer_options(
                     specialty=user_specialty,
                     user_base_pay=user_base_pay,
+                    years_of_experience_group=years_group,
+                    state=state,
                     skills_df=skills_overlap_df,
-                    comp_df=specialty_comp_df
+                    avg_pay_df=average_pay_df
                 )
 
                 if error_msg:
@@ -191,18 +195,53 @@ with tab3:
                 else:
                     st.success("✅ Top Specialty Transitions Based on Skills & Pay")
 
-                    polished_bullets = refine_skill_transfer_bullets(
+                    raw_bullets = []
+                    for _, row in suggestions_df.iterrows():
+                        skills = row["shared_skill_names"]
+                        skill_text = skills if isinstance(skills, str) else ", ".join(list(skills))
+                        bullet = f"• {row['specialty_2']}: +${row['pay_increase']:.0f}/hr — uses skills like {skill_text.lower()}"
+                        raw_bullets.append(bullet)
+
+                    polished_bullets, prompt = refine_skill_transfer_bullets(
                         specialty=user_specialty,
-                        raw_bullets=bullets
+                        raw_bullets=raw_bullets
                     )
 
                     for bullet in polished_bullets:
                         st.markdown(bullet)
 
+                    # Optional: Show detailed computation breakdown
+                    with st.expander("🔍 See How These Suggestions Were Calculated"):
+                        st.markdown("These suggestions are based on:")
+
+                        st.markdown(f"""
+                        - **Your Specialty:** `{user_specialty}`
+                        - **Your Base Pay:** `${user_base_pay}/hr`
+                        - **Experience Group:** `{years_group}`
+                        - **Location (State):** `{state}`
+                        - **Data Sources:**
+                            - Skill Overlap: `{skills_overlap_df.shape[0]}` records analyzed
+                            - Compensation Benchmarks: Filtered by specialty, state, and experience group
+                        """)
+
+                        # Show a breakdown table
+                        st.write(suggestions_df)
+
+                    with st.expander("🧾 Prompt Sent to OpenAI for Bullet Refinement"):
+                        st.code(prompt, language="markdown")
+
 
 # 4. Geographical Summary Tab
 with tab4:
-    st.subheader("Geographical Summary")
+    st.subheader("Summary")
     state_counts = nursing_df['state'].value_counts().reset_index()
     state_counts.columns = ['State', 'Count']
     st.bar_chart(state_counts.set_index('State'))
+
+    # Summary table of specialties by total years of experience (use average pay data)
+    st.subheader("Specialties by Experience Level")
+    exp_specialty = average_pay_df.groupby(['total_years_of_experience_group', 'specialty']).agg(
+        num_jobs=('specialty', 'count'),
+        avg_base_pay=('avg_base_pay', 'mean')
+    ).reset_index()
+    st.dataframe(exp_specialty, use_container_width=True)

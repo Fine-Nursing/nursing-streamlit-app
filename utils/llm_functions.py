@@ -89,14 +89,25 @@ def generate_culture_summary_from_inputs(user_ratings: dict, cohort_averages: di
     if all(v in [None, "", "NaN"] or pd.isna(v) for v in user_ratings.values()):
         return None, None, {}
 
-    prompt = f"""You are analyzing a nurse's workplace experience based on the following inputs.
+    prompt = f"""
+You're generating culture insights based on ratings and open feedback. Keep the tone clear, direct, and approachable.
 
-User Ratings:
+Output a list of 3 bullet points — each under 15 words.
+
+Avoid clinical terms and words like "user" or "the nurse."
+Never use phrases like "might suggest" or "could be" — just state the facts.
+Only compare to cohort averages when the difference is meaningful (> 0.2).
+Skip general statements that add no new info.
+If general feedback is useful, include it in a bullet.
+Use light emoji accents where it helps readability (e.g. 📈, 💬, 👥, 👍, 👎).
+
+Ratings:
 - Unit Culture: {user_ratings['unit_culture_rating']}
 - Benefits: {user_ratings['benefits_rating']}
 - Growth Opportunities: {user_ratings['growth_opportunities_rating']}
 - Hospital Quality: {user_ratings['hospital_quality_rating']}
-- General Feedback: "{user_ratings['general_feedback']}"
+
+Feedback: "{user_ratings['general_feedback']}"
 
 Cohort Averages:
 - Unit Culture: {cohort_averages.get('unit_culture_rating')}
@@ -104,13 +115,13 @@ Cohort Averages:
 - Growth Opportunities: {cohort_averages.get('growth_opportunities_rating')}
 - Hospital Quality: {cohort_averages.get('hospital_quality_rating')}
 
-Write 3–4 bullet points summarizing this nurse's workplace experience. Include thoughtful comparison to the cohort average if relevant. Be empathetic, clear, and use emojis.
+Return only 3 concise bullet points. No intro. No wrap-up.
 """
 
     system_prompt = (
-        "You are a professional assistant summarizing workplace culture insights based on survey ratings and written feedback. "
-        "Create clear, concise, and positive bullet points that reflect real sentiment."
-    )
+    "You write short, professional workplace insights from survey ratings. Output only clear, readable bullet points. "
+    "No fluff. No AI-sounding sentences. No references to 'user' or 'nurse'. Focus on what matters."
+)
 
     try:
         response = client.chat.completions.create(
@@ -126,15 +137,20 @@ Write 3–4 bullet points summarizing this nurse's workplace experience. Include
     except Exception as e:
         return f"❌ OpenAI error: {e}", prompt, user_ratings
 
-def compute_skill_transfer_options(specialty, user_base_pay, skills_df, comp_df):
+def compute_skill_transfer_options(specialty, user_base_pay, years_of_experience_group, state, skills_df, avg_pay_df):
     overlaps = skills_df[skills_df["specialty_1"].str.lower() == specialty.lower()]
     if overlaps.empty:
-        return "No skill overlap data available.", []
+        return "No skill overlap data available.", pd.DataFrame()
+
+    avg_df = avg_pay_df[
+        (avg_pay_df["total_years_of_experience_group"] == years_of_experience_group) &
+        (avg_pay_df["state"] == state)
+    ]
 
     merged = overlaps.merge(
-        comp_df,
-        left_on="specialty_2_id",
-        right_on="specialty_id",
+        avg_df,
+        left_on="specialty_2",
+        right_on="specialty",
         how="left"
     ).dropna(subset=["avg_base_pay"])
 
@@ -142,32 +158,60 @@ def compute_skill_transfer_options(specialty, user_base_pay, skills_df, comp_df)
     merged = merged[merged["pay_increase"] > 0]
 
     if merged.empty:
-        return "No higher-paying specialties with strong skill overlap found.", []
+        return "No higher-paying specialties with strong skill overlap found.", pd.DataFrame()
 
-    top_matches = merged.sort_values("overlap_percentage", ascending=False).head(5)
+    merged["shared_skill_names"] = merged["shared_skill_names"].apply(
+        lambda x: eval(x) if isinstance(x, str) else []
+    )
+    merged["top_skills"] = merged["shared_skill_names"].apply(
+        lambda x: ", ".join(list(x)[:2]) if isinstance(x, (list, set)) else ""
+    )
 
-    bullet_points = [
-        f"• {row['specialty_2']}: +${row['pay_increase']:.0f}/hr vs current pay"
-        for _, row in top_matches.iterrows()
-    ]
+    top_matches = merged.sort_values("pay_increase", ascending=False).head(5).copy()
 
-    return None, bullet_points
+    # Select key fields for display
+    top_matches = top_matches[[
+        "specialty_2", "avg_base_pay", "pay_increase",
+        "shared_skill_names", "avg_importance", "overlap_percentage",
+        "total_years_of_experience_group", "state"
+    ]]
+
+    top_matches["top_skills"] = top_matches["shared_skill_names"].apply(
+        lambda x: ", ".join(x[:2]) if isinstance(x, list) and len(x) >= 2 else ", ".join(x)
+    )
+
+    return None, top_matches
 
 def refine_skill_transfer_bullets(specialty: str, raw_bullets: list[str]) -> list[str]:
     bullet_block = "\n".join(raw_bullets)
 
     prompt = f"""A nurse currently works in the {specialty} specialty.
 
-Here are raw specialty suggestions that offer higher pay:
+Below are raw suggestions for potential specialty transitions with higher pay:
 {bullet_block}
 
-Rewrite them as 2–4 direct, professional bullet points. Keep the +$X/hr part. Make each bullet one line only. Avoid vague terms like 'potential', 'growth', or 'flexibility'. Use sharp, clear, descriptive phrases. Do not say 'you'. Do not include soft recommendations.
-Only return the bullet points.
+Rewrite these as 2-4 short, professional bullet points.
+
+Each bullet should:
+- Mention the suggested specialty
+- Indicate an approximate potential pay increase (e.g., +$X/hr)
+- Briefly mention relevant skill areas (in layman's terms), but acknowledge these are based on general specialty overlaps
+
+Guidelines:
+- Be cautious — do not assume the nurse has these skills
+- Use soft, suggestive language like “may offer”, “could align with”, “might be a fit”
+- Avoid personal pronouns like "you"
+- Each bullet must fit on one line
+- Keep the +$X/hr formatting
+- Do not overpromise or sound directive
+
+Output only the bullet points.
 """
 
     system_prompt = (
-        "You rewrite raw nursing specialty suggestions into direct, readable bullet points. Retain pay bump numbers (+$X/hr), and write clear 1-line descriptions. "
-        "Avoid vague or fluffy wording. No personal language. No multi-line bullets."
+        "Rewrite raw nursing specialty suggestions into short, professional bullet points. "
+        "Each bullet should describe a possible career transition, highlight a potential pay increase, and reference relevant skills in plain English. "
+        "Avoid personal pronouns, soft recommendations, or definitive promises."
     )
 
     try:
@@ -177,11 +221,11 @@ Only return the bullet points.
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.4,
-            max_tokens=150
+            temperature=0.3,
+            max_tokens=300
         )
         result = response.choices[0].message.content.strip()
-        refined_bullets = [line.strip() for line in result.split("\n") if line.strip().startswith("•")]
-        return refined_bullets
+        return [line.strip() for line in result.split("\n") if line.strip().startswith("•")], prompt
     except Exception as e:
         return [f"⚠️ GPT Error: {e}"]
+
