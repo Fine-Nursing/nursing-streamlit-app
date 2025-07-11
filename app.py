@@ -238,10 +238,27 @@ with tab4:
     state_counts.columns = ['State', 'Count']
     st.bar_chart(state_counts.set_index('State'))
 
-    # Summary table of specialties by total years of experience (use average pay data)
-    st.subheader("Specialties by Experience Level")
-    exp_specialty = average_pay_df.groupby(['total_years_of_experience_group', 'specialty']).agg(
-        num_jobs=('specialty', 'count'),
-        avg_base_pay=('avg_base_pay', 'mean')
-    ).reset_index()
-    st.dataframe(exp_specialty, use_container_width=True)
+    # Line graphs for each experience group in a single graph (use average_pay_df)
+    st.title("Average Base Pay by Specialty and Experience Group")
+
+    # Optional: filter by state
+    states = average_pay_df['state'].unique().tolist()
+    selected_state = st.selectbox("Select a State", ["ALL"] + states)
+
+    # Filter data
+    if selected_state == "ALL":
+        filtered_df = average_pay_df.copy()
+    else:
+        # Ensure the selected state is valid
+        if selected_state not in states:
+            st.warning(f"⚠️ No data available for state: {selected_state}")
+            st.stop()
+    # Pivot for Streamlit chart format
+    pivot_df = filtered_df.pivot_table(
+        index='specialty',
+        columns='total_years_of_experience_group',
+        values='avg_base_pay'
+    ).sort_index()
+
+    # Streamlit built-in line chart
+    st.line_chart(pivot_df)
