@@ -225,7 +225,7 @@ Output only the bullet points.
             max_tokens=300
         )
         result = response.choices[0].message.content.strip()
-        return [line.strip() for line in result.split("\n") if line.strip().startswith("•")], prompt
+        return [line.strip() for line in result.split("\n") if line.strip()], prompt
     except Exception as e:
         return [f"⚠️ GPT Error: {e}"]
 

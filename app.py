@@ -202,13 +202,18 @@ with tab3:
                         bullet = f"• {row['specialty_2']}: +${row['pay_increase']:.0f}/hr — uses skills like {skill_text.lower()}"
                         raw_bullets.append(bullet)
 
+                    st.write("#### Raw Bullet Points:")
+                    for bullet in raw_bullets:
+                        st.markdown(f"{bullet}")
+
                     polished_bullets, prompt = refine_skill_transfer_bullets(
                         specialty=user_specialty,
                         raw_bullets=raw_bullets
                     )
 
+                    st.write("#### Polished Bullet Points:")
                     for bullet in polished_bullets:
-                        st.markdown(bullet)
+                        st.markdown(f"{bullet}")
 
                     # Optional: Show detailed computation breakdown
                     with st.expander("🔍 See How These Suggestions Were Calculated"):
@@ -223,6 +228,11 @@ with tab3:
                             - Skill Overlap: `{skills_overlap_df.shape[0]}` records analyzed
                             - Compensation Benchmarks: Filtered by specialty, state, and experience group
                         """)
+
+                        # Normalize shared_skill_names so it's all strings
+                        suggestions_df['shared_skill_names'] = suggestions_df['shared_skill_names'].apply(
+                            lambda x: ", ".join(list(x)) if isinstance(x, (set, list)) else str(x)
+                        )
 
                         # Show a breakdown table
                         st.write(suggestions_df)

@@ -24,7 +24,7 @@ select
   j.organization_city as city,
   j.organization_state as state,
   nursing_role,
-  jd.specialty,
+  s.name as specialty,
   jd.sub_specialty,
   jd.shift_type,
   jd.employment_type,
@@ -45,6 +45,7 @@ from users u
 left join professional_info pi on u.id = pi.user_id
 left join filtered_jobs j on u.id = j.user_id
 left join job_details jd on j.id = jd.job_id
+left join specialties s on jd.specialty_id = s.id
 left join differentials_summary d on j.id = d.job_id
 left join culture c on j.id = c.job_id""")
 
@@ -82,7 +83,7 @@ def specialty_compensation():
     comp_df = pd.read_sql(text("""
     select
         specialty_id,
-        specialty,
+        specialties.name as specialty,
         count(*) as num_jobs,
         avg(base_pay) as avg_base_pay,
         min(base_pay) as min_base_pay,
@@ -91,6 +92,7 @@ def specialty_compensation():
         percentile_cont(0.5) within group (order by base_pay) as median_base_pay,
         percentile_cont(0.75) within group (order by base_pay) as p75_base_pay
     from job_details
+    left join specialties on job_details.specialty_id = specialties.id
     where base_pay is not null
     group by 1,2
     """), engine)
@@ -101,7 +103,7 @@ def average_pay_model():
     return pd.read_sql(text("""
     select
         total_years_of_experience_group,
-        specialty,
+        s.name as specialty,
         organization_state state,
         count(*) as num_jobs,
         avg(base_pay) as avg_base_pay,
@@ -111,6 +113,7 @@ def average_pay_model():
         percentile_cont(0.5) within group (order by base_pay) as median_base_pay,
         percentile_cont(0.75) within group (order by base_pay) as p75_base_pay
     from job_details jd
+    left join specialties s on jd.specialty_id = s.id
     left join jobs j on jd.job_id = j.id
     left join professional_info pi on j.user_id = pi.user_id
     where total_years_of_experience_group is not null
