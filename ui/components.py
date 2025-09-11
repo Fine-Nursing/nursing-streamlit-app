@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from data.loaders import get_existing_insight
 from config.settings import AI_MODELS, PARAMETER_DESCRIPTIONS
-from utils.cost_calculator import calculate_prompt_cost, display_cost_breakdown, CostTracker
 
 class UserSelector:
     """Component for selecting users with filtering"""
@@ -115,23 +114,3 @@ class DataDisplay:
         st.subheader("📝 Generated Prompt")
         st.code(prompt, language="text")
         st.write(f"**System Prompt:** `{system_prompt}`")
-    
-    @staticmethod
-    def show_cost_estimate(system_prompt, user_prompt, max_tokens, model):
-        """Show cost estimate for the prompt"""
-        cost_data = calculate_prompt_cost(system_prompt, user_prompt, max_tokens, model)
-        display_cost_breakdown(cost_data, "Estimated Cost for This Generation")
-
-class SessionCostSummary:
-    """Component for displaying session cost summary"""
-    
-    @staticmethod
-    def render():
-        """Render session cost summary"""
-        cost_tracker = CostTracker()
-        cost_tracker.display_session_summary()
-        
-        if st.button("🔄 Reset Cost Tracker"):
-            cost_tracker.reset()
-            st.success("Cost tracker reset!")
-            st.rerun()

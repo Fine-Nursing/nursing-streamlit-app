@@ -11,8 +11,7 @@ def check_password():
         # Replace this with your actual password hash
         # To generate: hashlib.sha256("your_password".encode()).hexdigest()
         correct_password_hash = st.secrets.get("APP_PASSWORD_HASH")
-        correct_password_hash = "c685b82fa8d9efb3fc52b5c9781930b6a4dba2835234cc9882c669445438ac9c"
-        
+
         if password_hash == correct_password_hash:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store the password
