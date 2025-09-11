@@ -74,44 +74,45 @@ class ResultsSummaryView:
                 if not user_rows.empty:
                     user_specialty = user_rows.iloc[0].get('specialty', 'N/A')
             
-            # Compact row layout
-            row_col1, row_col2, row_col3, row_col4 = st.columns([0.5, 2, 1, 1])
+            # Header row with metadata
+            header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
             
-            with row_col1:
-                st.write(f"**{idx}**")
+            with header_col1:
+                st.write(f"**{idx}. {insight_type}** - {user_name}")
             
-            with row_col2:
-                st.write(f"**{insight_type}** - {user_name}")
-                # Truncated content preview
-                content = row['content']
-                preview = content[:100] + "..." if len(content) > 100 else content
-                st.write(f"`{preview}`")
+            with header_col2:
+                st.write(f"**{user_specialty}** | {date_str}")
             
-            with row_col3:
-                st.write(f"**{user_specialty}**")
-                st.write(f"{date_str}")
-            
-            with row_col4:
-                if st.button("View", key=f"view_{idx}"):
+            with header_col3:
+                if st.button("Details", key=f"details_{idx}"):
                     st.session_state[f"show_detail_{idx}"] = not st.session_state.get(f"show_detail_{idx}", False)
             
-            # Show full content if requested
+            # Show full AI content by default
+            content = row['content']
+            st.success(content)
+            
+            # Show additional details if requested
             if st.session_state.get(f"show_detail_{idx}", False):
                 with st.container():
-                    st.write("**Full Content:**")
-                    st.success(content)
-                    
-                    # Quick details in two columns
+                    st.write("**Additional User Details:**")
                     detail_col1, detail_col2 = st.columns(2)
+                    
                     with detail_col1:
                         st.write(f"User ID: `{row['user_id']}`")
                         st.write(f"Email: {row.get('email', 'N/A')}")
+                        st.write(f"Content Length: {len(content)} characters")
+                    
                     with detail_col2:
                         if not self.nursing_df.empty:
                             user_rows = self.nursing_df[self.nursing_df['user_id'] == row['user_id']]
                             if not user_rows.empty:
                                 first_user_row = user_rows.iloc[0]
+                                st.write(f"Degree: {first_user_row.get('nursing_degree', 'N/A')}")
                                 st.write(f"Experience: {first_user_row.get('total_years_of_experience', 'N/A')} years")
                                 st.write(f"Base Pay: ${first_user_row.get('base_pay', 'N/A')}/hr")
+                            else:
+                                st.write("No additional user data found")
+                        else:
+                            st.write("No user data available")
             
             st.divider()
