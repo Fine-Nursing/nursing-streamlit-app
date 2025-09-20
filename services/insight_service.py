@@ -46,15 +46,19 @@ Write a professional 1-2 sentence summary of this nurse. Highlight their experie
 
         return prompt, []
     
-    def generate_professional_summary(self, user_data, model, temperature, max_tokens):
+    def generate_professional_summary(self, user_data, model, temperature, max_tokens, custom_system_prompt=None, custom_general_prompt=None):
         """Generate professional summary for a nurse"""
-        prompt, _ = self.build_professional_summary_prompt(user_data)
-        
+        # Use custom prompt if provided and not empty, otherwise use default
+        if custom_general_prompt and custom_general_prompt.strip():
+            prompt = custom_general_prompt.strip()
+        else:
+            prompt, _ = self.build_professional_summary_prompt(user_data)
+
         if prompt == "No data available":
             return "No data found", "N/A", []
 
-        system_prompt = AI_MODELS["professional_summary"]["system_prompt"]
-        
+        system_prompt = custom_system_prompt or AI_MODELS["professional_summary"]["system_prompt"]
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -65,7 +69,7 @@ Write a professional 1-2 sentence summary of this nurse. Highlight their experie
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            
+
             return response.choices[0].message.content.strip(), prompt, []
         except Exception as e:
             return f"Error: {e}", prompt, []
@@ -104,15 +108,19 @@ Return only 3 concise bullet points. No intro. No wrap-up."""
 
         return prompt, user_ratings
     
-    def generate_culture_analysis(self, user_ratings, cohort_averages, model, temperature, max_tokens):
+    def generate_culture_analysis(self, user_ratings, cohort_averages, model, temperature, max_tokens, custom_system_prompt=None, custom_general_prompt=None):
         """Generate culture analysis from ratings"""
-        prompt, validated_ratings = self.build_culture_analysis_prompt(user_ratings, cohort_averages)
-        
+        # Use custom prompt if provided and not empty, otherwise use default
+        if custom_general_prompt and custom_general_prompt.strip():
+            prompt = custom_general_prompt.strip()
+        else:
+            prompt, validated_ratings = self.build_culture_analysis_prompt(user_ratings, cohort_averages)
+
         if prompt is None:
             return None, None, {}
 
-        system_prompt = AI_MODELS["culture_analysis"]["system_prompt"]
-        
+        system_prompt = custom_system_prompt or AI_MODELS["culture_analysis"]["system_prompt"]
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -123,7 +131,7 @@ Return only 3 concise bullet points. No intro. No wrap-up."""
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            
+
             return response.choices[0].message.content.strip(), prompt, user_ratings
         except Exception as e:
             return f"Error: {e}", prompt, user_ratings
@@ -156,11 +164,16 @@ Output only the bullet points."""
 
         return prompt
     
-    def generate_skill_transfer_suggestions(self, specialty, raw_bullets, model, temperature, max_tokens):
+    def generate_skill_transfer_suggestions(self, specialty, raw_bullets, model, temperature, max_tokens, custom_system_prompt=None, custom_general_prompt=None):
         """Generate refined skill transfer suggestions"""
-        prompt = self.build_skill_transfer_prompt(specialty, raw_bullets)
-        system_prompt = AI_MODELS["skill_transfer"]["system_prompt"]
-        
+        # Use custom prompt if provided and not empty, otherwise use default
+        if custom_general_prompt and custom_general_prompt.strip():
+            prompt = custom_general_prompt.strip()
+        else:
+            prompt = self.build_skill_transfer_prompt(specialty, raw_bullets)
+
+        system_prompt = custom_system_prompt or AI_MODELS["skill_transfer"]["system_prompt"]
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -171,7 +184,7 @@ Output only the bullet points."""
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            
+
             content = response.choices[0].message.content.strip()
             lines = content.split("\n")
             cleaned = [line.strip() for line in lines if line.strip()]

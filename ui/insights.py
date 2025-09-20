@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-from ui.components import ParameterControls, DataDisplay
-from config.settings import AI_MODELS
+from ui.components import ParameterControls, DataDisplay, PromptEditor
 
 class ProfessionalSummaryView:
     """View component for Professional Summary insight"""
@@ -19,7 +18,7 @@ class ProfessionalSummaryView:
         # Parameters
         param_controls = ParameterControls("Professional Summary")
         model, temperature, max_tokens = param_controls.render()
-        
+
         # Input data breakdown
         st.subheader("📊 Input Data Being Used")
         
@@ -67,9 +66,12 @@ class ProfessionalSummaryView:
                 st.write(f"• Differentials: `{job.get('differentials', 'N/A')}`")
         
         # Build and show prompt
-        system_prompt = AI_MODELS["professional_summary"]["system_prompt"]
         prompt, _ = self.insight_service.build_professional_summary_prompt(self.user_data)
-        DataDisplay.show_prompt_and_system(prompt, system_prompt)
+        edited_prompt = DataDisplay.show_prompt_and_system(prompt, "", "Professional Summary")
+
+        # Prompt customization
+        prompt_editor = PromptEditor("Professional Summary")
+        custom_system_prompt = prompt_editor.render()
         
         # Check existing insight
         DataDisplay.show_existing_insight_status(
@@ -81,7 +83,7 @@ class ProfessionalSummaryView:
             try:
                 with st.spinner("Generating..."):
                     content, prompt_used, job_details = self.insight_service.generate_professional_summary(
-                        self.user_data, model, temperature, max_tokens
+                        self.user_data, model, temperature, max_tokens, custom_system_prompt, edited_prompt
                     )
                     
                     if content and not content.startswith("Error:"):
@@ -110,7 +112,7 @@ class CultureAnalysisView:
         # Parameters
         param_controls = ParameterControls("Culture Analysis")
         model, temperature, max_tokens = param_controls.render()
-        
+
         # Input data section
         st.subheader("📊 Input Data Required")
         
@@ -163,9 +165,12 @@ class CultureAnalysisView:
         }
         
         # Build and show prompt
-        system_prompt = AI_MODELS["culture_analysis"]["system_prompt"]
         prompt, _ = self.insight_service.build_culture_analysis_prompt(user_ratings, cohort_averages)
-        DataDisplay.show_prompt_and_system(prompt, system_prompt)
+        edited_prompt = DataDisplay.show_prompt_and_system(prompt, "", "Culture Analysis")
+
+        # Prompt customization
+        prompt_editor = PromptEditor("Culture Analysis")
+        custom_system_prompt = prompt_editor.render()
         
         # Check existing insight
         DataDisplay.show_existing_insight_status(
@@ -177,7 +182,7 @@ class CultureAnalysisView:
             try:
                 with st.spinner("Generating..."):
                     content, prompt_used, ratings_used = self.insight_service.generate_culture_analysis(
-                        user_ratings, cohort_averages, model, temperature, max_tokens
+                        user_ratings, cohort_averages, model, temperature, max_tokens, custom_system_prompt, edited_prompt
                     )
                     
                     if content and not content.startswith("Error:"):
@@ -218,7 +223,7 @@ class SkillTransferView:
         # Parameters
         param_controls = ParameterControls("Skill Transfer")
         model, temperature, max_tokens = param_controls.render()
-        
+
         # Current user data
         st.subheader("📊 Current User Data")
         curr_col1, curr_col2 = st.columns(2)
@@ -283,9 +288,12 @@ class SkillTransferView:
             raw_bullets.append(f"• {specialty}: +${increase:.0f}/hr potential increase")
         
         # Build and show prompt
-        system_prompt = AI_MODELS["skill_transfer"]["system_prompt"]
         prompt = self.insight_service.build_skill_transfer_prompt(current_specialty, raw_bullets)
-        DataDisplay.show_prompt_and_system(prompt, system_prompt)
+        edited_prompt = DataDisplay.show_prompt_and_system(prompt, "", "Skill Transfer")
+
+        # Prompt customization
+        prompt_editor = PromptEditor("Skill Transfer")
+        custom_system_prompt = prompt_editor.render()
         
         # Check existing insight
         DataDisplay.show_existing_insight_status(
@@ -297,7 +305,7 @@ class SkillTransferView:
             try:
                 with st.spinner("Generating..."):
                     suggestions, prompt_used = self.insight_service.generate_skill_transfer_suggestions(
-                        current_specialty, raw_bullets, model, temperature, max_tokens
+                        current_specialty, raw_bullets, model, temperature, max_tokens, custom_system_prompt, edited_prompt
                     )
                     
                     if suggestions and not str(suggestions[0]).startswith("Error:"):

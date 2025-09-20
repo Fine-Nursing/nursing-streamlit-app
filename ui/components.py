@@ -84,9 +84,39 @@ class ParameterControls:
         
         return model, temperature, max_tokens
 
+class PromptEditor:
+    """Component for editing AI prompts"""
+
+    def __init__(self, insight_type):
+        self.insight_type = insight_type
+        self.config_key = insight_type.lower().replace(" ", "_")
+        self.config = AI_MODELS[self.config_key]
+
+    def render(self):
+        """Render prompt editor and return custom prompts"""
+        st.subheader("✏️ System Prompt")
+
+        # Check if user has modified the prompt from default
+        default_prompt = self.config["system_prompt"]
+
+        custom_system_prompt = st.text_area(
+            "Edit the system prompt or leave as default:",
+            value=default_prompt,
+            height=120,
+            key=f"system_prompt_{self.config_key}",
+            help="This controls how the AI behaves. Changes apply automatically when generating."
+        )
+
+        # Only show reset button if the prompt has been modified
+        if custom_system_prompt != default_prompt:
+            if st.button("🔄 Reset to Default", key=f"reset_{self.config_key}"):
+                st.rerun()
+
+        return custom_system_prompt
+
 class DataDisplay:
     """Component for displaying user data"""
-    
+
     @staticmethod
     def show_user_header(user_data, selected_user_id):
         """Show user header with name and basic info"""
@@ -95,7 +125,7 @@ class DataDisplay:
             user_name = f"{first_row.get('first_name', 'No First')} {first_row.get('last_name', 'No Last')}"
             st.subheader(f"👤 {user_name}")
             st.write(f"**User ID:** {selected_user_id} | **Email:** {first_row.get('email', 'N/A')}")
-    
+
     @staticmethod
     def show_existing_insight_status(ai_insights_df, selected_user_id, insight_type):
         """Show existing insight status"""
@@ -107,10 +137,25 @@ class DataDisplay:
         else:
             st.info("ℹ️ No existing insight - will generate new")
         return existing_insight
-    
+
     @staticmethod
-    def show_prompt_and_system(prompt, system_prompt):
+    def show_prompt_and_system(prompt, system_prompt, insight_type="general"):
         """Show the generated prompt and system prompt"""
         st.subheader("📝 Generated Prompt")
-        st.code(prompt, language="text")
-        st.write(f"**System Prompt:** `{system_prompt}`")
+
+        # Make the general prompt editable with unique key per insight type
+        edited_prompt = st.text_area(
+            "Edit the general prompt or leave as generated:",
+            value=prompt,
+            height=200,
+            key=f"general_prompt_editor_{insight_type.lower().replace(' ', '_')}",
+            help="This is the main prompt sent to the AI. You can edit it to customize the request."
+        )
+
+        # Debug info to show what's being used
+        if edited_prompt != prompt:
+            st.info(f"🔄 Using edited prompt (length: {len(edited_prompt)} chars)")
+        else:
+            st.info(f"📄 Using default prompt (length: {len(prompt)} chars)")
+
+        return edited_prompt
